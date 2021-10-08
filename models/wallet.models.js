@@ -21,6 +21,9 @@ const WalletSchema = new mongoose.Schema({
         minlength: 1,
         trim: true
     },
+    rechargeId: {
+        type: ObjectId
+    },
     transactionid: {
         type: String,
         // required: true,

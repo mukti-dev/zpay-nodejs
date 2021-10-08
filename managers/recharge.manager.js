@@ -1,5 +1,6 @@
 const { Recharge } = require('../models/recharge.models')
 const { ObjectId } = require('mongoose').Types
+const moment = require('moment')
 const getRechargeData = async (userId, reqBody) => {
     try {
         let query
@@ -53,18 +54,37 @@ const getRechargePendingData = async (status, reqBody) => {
 
 const gettodayRechargeData = async (createdAt, reqBody) => {
     try {
-        let query
-        query = {
-            $and: [{
-                "createdAt": {
-                    "$gte": createdAt,
-                    "$lt": createdAt
-                }
-            }]
-        }
+        let today = moment().format('DD-MM-YYYY') + " 12:00:00 AM"
+        today = moment(today, 'DD-MM-YYYY hh:mm:ss A').format()
 
-        console.log(JSON.stringify(query))
-        const rechargeData = await Recharge.find(query).exec()
+        let query = [
+            {
+                $match: {
+                    createdAt: {
+                        "$gte": new Date(today)
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userid',
+                    foreignField: '_id',
+                    as: 'userDetail'
+                }
+            }, {
+                $lookup: {
+                    from: 'transactions',
+                    localField: 'userid',
+
+                }
+            }
+        ]
+        // console.log(JSON.stringify(query))
+        const rechargeData = await Recharge.aggregate(query).exec()
+        // console.log(rechargeData)
+
+
         return rechargeData
 
     } catch (error) {
@@ -89,6 +109,37 @@ const getallRechargeData = async () => {
     }
 }
 
+const getOldRechargeData = async () => {
+    try {
+        let today = moment().format('DD-MM-YYYY') + " 12:00:00 AM"
+        today = moment(today, 'DD-MM-YYYY hh:mm:ss A').format()
+        let query = [
+            {
+                $match: {
+                    createdAt: {
+                        "$lt": new Date(today)
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userid',
+                    foreignField: '_id',
+                    as: 'userDetail'
+                }
+            }
+        ]
+        const result = await Recharge.aggregate(query).exec()
+        console.log(query)
+        console.log(result)
+
+        return result
+    } catch (error) {
+        throw error
+    }
+}
+
 const addRechargeManager = async (reqBody) => {
     try {
         const recharge = new Recharge(reqBody)
@@ -99,4 +150,4 @@ const addRechargeManager = async (reqBody) => {
     }
 }
 
-module.exports = { getRechargeData, getRechargeDetail, getRechargePendingData, gettodayRechargeData, getallRechargeData, addRechargeManager }
+module.exports = { getRechargeData, getRechargeDetail, getRechargePendingData, gettodayRechargeData, getallRechargeData, getOldRechargeData, addRechargeManager }

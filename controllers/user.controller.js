@@ -10,7 +10,7 @@ const registerUser = async (req, res) => {
         delete responseData.__v
         let authToken = await generateJwtToken(responseData)
         responseData.authToken = authToken
-        console.log('response', responseData)
+
         successResponse(req, res, responseData, 'User data saved')
     } catch (error) {
         // console.log(error)
@@ -25,7 +25,6 @@ const loginUser = async (req, res) => {
         let userData = JSON.parse(JSON.stringify(user))
         delete userData.password
         delete userData.__v
-        console.log('resposne', userData)
         let authToken = await generateJwtToken(userData)
         userData.authToken = authToken
         successResponse(req, res, userData, 'User Logged in successfully')

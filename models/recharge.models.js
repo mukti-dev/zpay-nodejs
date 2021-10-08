@@ -1,25 +1,13 @@
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types
 const RechargeSchema = new mongoose.Schema({
-    // id: {
-    //     type: mongoose.Types.ObjectId,
-    //     // type: String,
-    //     required: true,
-    //     minlength: 1,
-    //     trim: true
-    // },
-    // transactionId: {
-    //     type: ObjectId,
-    //     required: true,
-    //     minlength: 1,
-    //     trim: true
-    // },
-    // rechargeId: {
-    //     type: ObjectId,
-    //     required: true,
-    //     minlength: 1,
-    //     trim: true
-    // },
+
+    transactionId: {
+        type: String,
+    },
+    rechargeId: {
+        type: String,
+    },
     userid: {
         type: ObjectId,
         required: true,
@@ -28,20 +16,13 @@ const RechargeSchema = new mongoose.Schema({
     },
     mobile: {
         type: String,
-        // required: true,
-        // minlength: 1,
         trim: true
     },
     amount: {
         type: Number,
-        // required: true,
-        // minlength: 1,
-        trim: true
     },
     operator: {
         type: String,
-        // required: true,
-        // minlength: 1,
         trim: true
     },
     status: {
@@ -52,8 +33,7 @@ const RechargeSchema = new mongoose.Schema({
     },
     errormessage: {
         type: String,
-        // required: true,
-        // minlength: 1,
+        default: 'N/A',
         trim: true
     },
     createdAt: {

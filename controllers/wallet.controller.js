@@ -1,4 +1,5 @@
-const { getWalletData, getWalletDetail, getAllWallet, addNewTransaction, addNewWallet, updateWalletBalance, rechargeTransactionManager, userWallet, razorpayRechargeTransactionManager } = require('../managers/wallet.manager')
+const { getWalletData, getWalletDetail, getAllWallet, addNewTransaction, getTodayWallet, addNewWallet, updateWalletBalance, rechargeTransactionManager, userWallet, razorpayRechargeTransactionManager } = require('../managers/wallet.manager')
+const { getallRechargeData } = require('../managers/recharge.manager')
 const { successResponse, failureResponse } = require('../services/responseGenerator')
 const razorpayConfig = require('../config/appConfig.json').RAZOR_PAY
 const zpayConfig = require('../config/appConfig.json').ZPAY
@@ -30,8 +31,22 @@ const walletDetail = async (req, res) => {
 
 const allWallet = async (req, res) => {
     try {
-        const walletData = await getAllWallet()
-        successResponse(req, res, walletData, 'All Wallet data fetched successfully')
+        let userId = req.params.userId
+        const data = await getAllWallet(userId)
+        // const data = await getallRechargeData()
+        // console.log(data)
+
+        successResponse(req, res, data, 'All Wallet data fetched successfully')
+    } catch (error) {
+        failureResponse(req, res, error)
+    }
+}
+
+const todayWallet = async (req, res) => {
+    try {
+        let userId = req.params.userId
+        const data = await getTodayWallet(userId)
+        successResponse(req, res, data, 'All Wallet data fetched successfully')
     } catch (error) {
         failureResponse(req, res, error)
     }
@@ -88,7 +103,7 @@ const addMoney = async (req, res) => {
             status: status,
             transactionid: addTransaction._id,
             transactionSource: devSource,
-            naration: 'Recharge Amount :' + amount + ', TransactionId: ' + addTransaction._id,
+            naration: 'Add Money by PG; Recharge Amount :' + amount + ', TransactionId: ' + addTransaction._id,
             createdBy: userid,
             modifiedBy: userid
         }
@@ -145,4 +160,4 @@ const razorpayRechargeTransaction = async (req, res) => {
     }
 }
 
-module.exports = { walletHistory, walletDetail, allWallet, createOrder, addMoney, rechargeTransaction, razorpayRechargeTransaction }
+module.exports = { walletHistory, walletDetail, allWallet, todayWallet, createOrder, addMoney, rechargeTransaction, razorpayRechargeTransaction }

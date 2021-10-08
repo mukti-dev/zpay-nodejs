@@ -60,7 +60,7 @@ const getOperatorCashback = async (operatorCode) => {
             let err = new NotFoundError('No Operator found')
             throw err
         }
-    } catch (erorr) {
+    } catch (error) {
         throw error
     }
 }

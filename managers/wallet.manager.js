@@ -5,16 +5,18 @@ const Users = require('../models/users.models')
 const { Recharge } = require('../models/recharge.models')
 const axios = require('axios')
 const { UpgradeRequiredError, InternalServerError } = require('../_errorHandler/error')
-
+const operatorConfig = require('../config/operatorConfig.json')
 const { getUserById } = require('../managers/user.manager')
 const { addRechargeManager } = require('../managers/recharge.manager')
+
+const moment = require('moment')
 
 
 const getWalletData = async (userId, reqBody) => {
     try {
-        let query
+        let matchQuery
         if (reqBody.startDate && reqBody.endDate) {
-            query = {
+            matchQuery = {
                 $and: [{ userid: userId }, {
                     "createdAt": {
                         "$gte": reqBody.startDate,
@@ -23,10 +25,22 @@ const getWalletData = async (userId, reqBody) => {
                 }]
             }
         } else {
-            query = { userid: userId }
+            matchQuery = { userid: new ObjectId(userId) }
         }
-        console.log(JSON.stringify(query))
-        const walletData = await Wallet.find(query).exec()
+        const walletData = await Wallet.aggregate([
+            { $match: matchQuery },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userid',
+                    foreignField: '_id',
+                    as: 'userData'
+                }
+            }
+
+        ]).exec()
+        // const walletData = await Wallet.find(matchQuery).exec()
+        console.log(walletData)
         return walletData
 
     } catch (error) {
@@ -45,10 +59,12 @@ const getWalletDetail = async (rechargeId) => {
 }
 
 
-const getAllWallet = async () => {
+const getAllWallet = async (userId) => {
+    userId = userId || false
     try {
         // return await Wallet.find({}).exec()
-        const result = await Wallet.aggregate([
+        let aggrArr = [
+            { $sort: { createdAt: 1 } },
             {
                 $lookup: {
                     from: 'users',
@@ -57,9 +73,25 @@ const getAllWallet = async () => {
                     as: 'userDetail'
                 }
             },
+            {
+                $lookup: {
+                    from: 'recharges',
+                    localField: 'rechargeId',
+                    foreignField: '_id',
+                    as: 'rechargeDetails'
+                }
+            },
 
-        ]).exec()
-        console.log(result.length)
+        ]
+        if (userId) {
+            aggrArr.push({
+                $match: {
+                    userid: ObjectId(userId),
+                }
+            })
+        }
+        const result = await Wallet.aggregate(aggrArr).exec()
+
         const data = JSON.parse(JSON.stringify(result))
 
         let response = []
@@ -70,6 +102,7 @@ const getAllWallet = async () => {
             let service = "N/A"
             let operator = "N/A"
             let phone = ""
+            let name = ""
             if (data[i].service) {
                 service = data[i].service
             }
@@ -78,6 +111,14 @@ const getAllWallet = async () => {
             }
             if (data[i].userDetail.length > 0) {
                 phone = data[i].userDetail[0].phone
+                name = data[i].userDetail[0].name
+            }
+
+            if (data[i].rechargeDetails.length > 0) {
+                let optCode = data[i].rechargeDetails[0].operator
+                let operatorData = operatorConfig.find(e => e.operatorCode === optCode);
+                service = operatorData.operatorType
+                operator = operatorData.operatorName
             }
 
             let credit = data[i].credit ? data[i].credit : 0
@@ -86,9 +127,97 @@ const getAllWallet = async () => {
 
             let obj = {
                 mobile: phone,
+                name: name,
                 services: service,
                 operator: operator,
                 naration: data[i].naration,
+                credit: credit,
+                debit: debit,
+                total: total
+            }
+            if (data[i].userDetail.length > 0) {
+                response.push(obj)
+            }
+
+        }
+        return response
+    } catch (error) {
+        throw error
+    }
+}
+
+
+const getTodayWallet = async () => {
+    try {
+
+        let today = moment().format('DD-MM-YYYY') + " 12:00:00 AM"
+        today = moment(today, 'DD-MM-YYYY hh:mm:ss A').format()
+
+        let aggrArr = [
+            { $sort: { createdAt: 1 } },
+            {
+                $match: {
+                    createdAt: {
+                        "$gte": new Date(today)
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userid',
+                    foreignField: '_id',
+                    as: 'userDetail'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'recharges',
+                    localField: 'rechargeId',
+                    foreignField: '_id',
+                    as: 'rechargeDetails'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'createdBy',
+                    foreignField: '_id',
+                    as: 'createduserDetail'
+                }
+            }
+
+        ]
+        const result = await Wallet.aggregate(aggrArr).exec()
+        const data = JSON.parse(JSON.stringify(result))
+
+        let response = []
+        let total = 0
+        for (let i = 0; i < data.length; i++) {
+
+            let phone = ""
+            let name = ""
+            if (data[i].service) {
+                service = data[i].service
+            }
+            if (data[i].operator) {
+                operator = data[i].operator
+            }
+            if (data[i].userDetail.length > 0) {
+                phone = data[i].userDetail[0].phone
+                name = data[i].userDetail[0].name
+            }
+
+            let credit = data[i].credit ? data[i].credit : 0
+            let debit = data[i].debit ? data[i].debit : 0
+            total = total + parseFloat(credit) - parseFloat(debit)
+
+            let obj = {
+                mobile: phone,
+                name: name,
+                naration: data[i].naration,
+                createdBy: data[i]?.createduserDetail[0]?.name,
+                createdAt: data[i].createdAt,
                 credit: credit,
                 debit: debit,
                 total: total
@@ -153,8 +282,13 @@ const rechargeTransactionManager = async (reqBody) => {
         let devSource = reqBody.devSource
 
         let wallet = await Wallet.aggregate([{ $match: { userid: new ObjectId(userid) } }, { $group: { _id: "$userid", creditsum: { $sum: "$credit" }, debitsum: { $sum: "$debit" } } }]).exec()
+        console.log(wallet)
 
-        let bal = wallet[0].creditsum - wallet[0].debitsum;
+        let bal = 0
+        if (wallet.length > 0) {
+            bal = wallet[0].creditsum - wallet[0].debitsum;
+        }
+        console.log(bal)
 
         if (bal >= amount) {
             return new Promise(async (resolve, reject) => {
@@ -177,47 +311,7 @@ const rechargeTransactionManager = async (reqBody) => {
                 };
 
                 axios(config).then(async (response) => {
-                    if (response.data.Status == "Failed") {
-                        let recharge = {
-                            transactionId: 'test',
-                            userid: userid,
-                            mobile: phone,
-                            amount: amount,
-                            operator: optcode,
-                            status: response.data.Status,
-                            createdBy: userid,
-                            modifiedBy: userid,
-                        }
-                        await addRechargeManager(recharge)
-
-
-                        reject(new InternalServerError(response.data.Errormsg))
-                    }
                     if (response.data.Status == 'Success') {
-                        if (parseFloat(amount) > 0) {
-                            let newWallet1 = {
-                                userid: userid,
-                                debit: amount,
-                                transactionSource: devSource,
-                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
-                                status: response.data.Status,
-                                createdBy: userid,
-                                modifiedBy: userid
-                            };
-                            let addWalttet = await addNewWallet(newWallet1)
-                        }
-                        if (parseFloat(cashback) > 0) {
-                            let newWallet1 = {
-                                userid: userid,
-                                credit: cashback,
-                                transactionSource: devSource,
-                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
-                                status: response.data.Status,
-                                createdBy: userid,
-                                modifiedBy: userid
-                            };
-                            let addWalttet = await addNewWallet(newWallet1)
-                        }
 
                         const recharge = {
                             transactionId: response.data.Transid,
@@ -231,6 +325,37 @@ const rechargeTransactionManager = async (reqBody) => {
                             modifiedBy: userid,
                         }
                         const addRecharge = await addRechargeManager(recharge)
+
+                        if (parseFloat(amount) > 0) {
+                            let newWallet1 = {
+                                userid: userid,
+                                debit: amount,
+                                operator: optcode,
+                                rechargeId: addRecharge._id,
+                                transactionSource: devSource,
+                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
+                                status: response.data.Status,
+                                createdBy: userid,
+                                modifiedBy: userid
+                            };
+                            let addWalttet = await addNewWallet(newWallet1)
+                        }
+                        if (parseFloat(cashback) > 0) {
+                            let newWallet1 = {
+                                userid: userid,
+                                credit: cashback,
+                                operator: optcode,
+                                rechargeId: addRecharge._id,
+                                transactionSource: devSource,
+                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
+                                status: response.data.Status,
+                                createdBy: userid,
+                                modifiedBy: userid
+                            };
+                            let addWalttet = await addNewWallet(newWallet1)
+                        }
+
+
 
                         const userData = await getUserById(userid)
 
@@ -250,6 +375,22 @@ const rechargeTransactionManager = async (reqBody) => {
 
                         });
 
+                    } else {
+                        let recharge = {
+                            transactionId: response.data.Transid,
+                            rechargeId: response.data.RechargeID,
+                            userid: userid,
+                            mobile: phone,
+                            amount: amount,
+                            operator: optcode,
+                            status: response.data.Status,
+                            createdBy: userid,
+                            errormessage: response.data.Errormsg,
+                            modifiedBy: userid,
+                        }
+                        await addRechargeManager(recharge)
+
+                        reject(new InternalServerError(response.data.Errormsg))
                     }
                 }).catch((error) => {
                     console.log(error)
@@ -282,9 +423,36 @@ const razorpayRechargeTransactionManager = async (reqBody) => {
         let state = reqBody.state
         let devSource = reqBody.devSource
 
-        let wallet = await Wallet.aggregate([{ $match: { userid: new ObjectId(userid) } }, { $group: { _id: "$userid", creditsum: { $sum: "$credit" }, debitsum: { $sum: "$debit" } } }]).exec()
 
-        let bal = wallet[0].creditsum - wallet[0].debitsum;
+        let newTransaction = {
+            userId: userid,
+            amount: amount,
+            transactionid: transactionid,
+            status: 'Success',
+            createdBy: userid,
+            modifiedBy: userid,
+        }
+        const addTransactionBeforeRecharge = await addNewTransaction(newTransaction)
+
+        let addWalletbeforeRecarge = new Wallet({
+            userid: userid,
+            credit: amount,
+            status: 'Success',
+            transactionid: addTransactionBeforeRecharge._id,
+            transactionSource: devSource,
+            naration: 'Add Money By PG of amount ' + amount + ' For recharge operator ' + optcode,
+            createdBy: userid,
+            modifiedBy: userid
+        })
+
+        await addNewWallet(addWalletbeforeRecarge)
+        await updateWalletBalance(userid, amount)
+
+        let wallet = await Wallet.aggregate([{ $match: { userid: new ObjectId(userid) } }, { $group: { _id: "$userid", creditsum: { $sum: "$credit" }, debitsum: { $sum: "$debit" } } }]).exec()
+        let bal = 0
+        if (wallet.length > 0) {
+            bal = wallet[0].creditsum - wallet[0].debitsum;
+        }
 
         if (bal >= amount) {
             return new Promise(async (resolve, reject) => {
@@ -307,58 +475,8 @@ const razorpayRechargeTransactionManager = async (reqBody) => {
                 };
 
                 axios(config).then(async (response) => {
-                    if (response.data.Status == "Failed") {
-                        let recharge = {
-                            transactionId: 'test',
-                            userid: userid,
-                            mobile: phone,
-                            amount: amount,
-                            operator: optcode,
-                            status: response.data.Status,
-                            createdBy: userid,
-                            modifiedBy: userid,
-                        }
-                        await addRechargeManager(recharge)
-                        console.log(response)
-                        reject(new InternalServerError(response.data.Errormsg))
-                    }
                     if (response.data.Status == 'Success') {
 
-                        let transaction = new Transaction({
-                            userId: userid,
-                            amount: amount,
-                            transactionid: transactionid,
-                            status: response.data.Status,
-                            createdBy: userid,
-                            modifiedBy: userid,
-                        })
-                        console.log(transaction)
-                        await transaction.save()
-
-                        if (parseFloat(amount) > 0) {
-                            let newWallet1 = {
-                                userid: userid,
-                                debit: amount,
-                                transactionSource: devSource,
-                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
-                                status: response.data.Status,
-                                createdBy: userid,
-                                modifiedBy: userid
-                            };
-                            let addWalttet = await addNewWallet(newWallet1)
-                        }
-                        if (parseFloat(cashback) > 0) {
-                            let newWallet1 = {
-                                userid: userid,
-                                credit: cashback,
-                                transactionSource: devSource,
-                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
-                                status: response.data.Status,
-                                createdBy: userid,
-                                modifiedBy: userid
-                            };
-                            let addWalttet = await addNewWallet(newWallet1)
-                        }
 
                         const recharge = {
                             transactionId: response.data.Transid,
@@ -372,6 +490,36 @@ const razorpayRechargeTransactionManager = async (reqBody) => {
                             modifiedBy: userid,
                         }
                         const addRecharge = await addRechargeManager(recharge)
+                        if (parseFloat(amount) > 0) {
+                            let newWallet1 = {
+                                userid: userid,
+                                debit: amount,
+                                rechargeId: addRecharge._id,
+                                operator: optcode,
+                                transactionSource: devSource,
+                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
+                                status: response.data.Status,
+                                createdBy: userid,
+                                modifiedBy: userid
+                            };
+                            let addWalttet = await addNewWallet(newWallet1)
+                        }
+                        if (parseFloat(cashback) > 0) {
+                            let newWallet1 = {
+                                userid: userid,
+                                credit: cashback,
+                                operator: optcode,
+                                rechargeId: addRecharge._id,
+                                transactionSource: devSource,
+                                naration: 'For RechargeId: ' + response.data.RechargeID + ', and TransactionId: ' + response.data.Transid,
+                                status: response.data.Status,
+                                createdBy: userid,
+                                modifiedBy: userid
+                            };
+                            let addWalttet = await addNewWallet(newWallet1)
+                        }
+
+
 
                         const userData = await getUserById(userid)
 
@@ -393,6 +541,20 @@ const razorpayRechargeTransactionManager = async (reqBody) => {
                             reject(error)
                         })
 
+                    } else {
+                        let recharge = {
+                            transactionId: response.data.Transid,
+                            userid: userid,
+                            mobile: phone,
+                            amount: amount,
+                            operator: optcode,
+                            status: response.data.Status,
+                            createdBy: userid,
+                            modifiedBy: userid,
+                        }
+                        await addRechargeManager(recharge)
+                        console.log(response)
+                        reject(new InternalServerError(response.data.Errormsg))
                     }
                 }).catch((error) => {
                     console.log(error)
@@ -411,4 +573,4 @@ const razorpayRechargeTransactionManager = async (reqBody) => {
 
 
 
-module.exports = { getWalletData, getWalletDetail, getWalletDetail, getAllWallet, addNewTransaction, addNewWallet, updateWalletBalance, razorpayRechargeTransactionManager, rechargeTransactionManager }
+module.exports = { getWalletData, getWalletDetail, getWalletDetail, getAllWallet, getTodayWallet, addNewTransaction, addNewWallet, updateWalletBalance, razorpayRechargeTransactionManager, rechargeTransactionManager }

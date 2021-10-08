@@ -1,4 +1,4 @@
-const { getRechargeData, getRechargeDetail, getRechargePendingData, gettodayRechargeData, getallRechargeData } = require('../managers/recharge.manager')
+const { getRechargeData, getRechargeDetail, getRechargePendingData, gettodayRechargeData, getallRechargeData, getOldRechargeData } = require('../managers/recharge.manager')
 const { successResponse, failureResponse } = require('../services/responseGenerator')
 const rechargeHistory = async (req, res) => {
     try {
@@ -61,4 +61,13 @@ const allRecharge = async (req, res) => {
 
 }
 
-module.exports = { rechargeHistory, rechargeDetail, rechargePending, todayRecharge, allRecharge }
+const oldRecharge = async (req, res) => {
+    try {
+        const result = await getOldRechargeData()
+        successResponse(req, res, result, 'All Old Recharges data fetched successfully')
+    } catch (error) {
+        failureResponse(req, res, error)
+    }
+}
+
+module.exports = { rechargeHistory, rechargeDetail, rechargePending, todayRecharge, allRecharge, oldRecharge }
