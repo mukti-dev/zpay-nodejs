@@ -1,4 +1,9 @@
+const https = require('https')
+const fs = require('fs')
+
+
 const express = require('express');
+
 const cors = require('cors')
 const app = express()
 const bodyParser = require('body-parser');
@@ -16,7 +21,13 @@ app.use(cors())
 
 app.use('/', require('./routes/index'))
 
-app.listen(PORT, () => {
-    console.log(`Zpay is running at PORT: ${PORT}`)
-})
+var privateKey = fs.readFileSync('./utils/privkey.pem');
+var certificate = fs.readFileSync('./utils/cert.pem');
 
+
+https.createServer({
+    key: privateKey,
+    cert: certificate
+}, app).listen(PORT, () => {
+    console.log(`Zpay is running at PORT: ${PORT}`)
+});
