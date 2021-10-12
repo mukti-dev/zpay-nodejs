@@ -17,7 +17,6 @@ const WalletSchema = new mongoose.Schema({
     },
     naration: {
         type: String,
-        // required: true,
         minlength: 1,
         trim: true
     },
@@ -26,19 +25,15 @@ const WalletSchema = new mongoose.Schema({
     },
     transactionid: {
         type: String,
-        // required: true,
-        // minlength: 1,
-        // trim: true
+    },
+    source: {
+        type: String,
     },
     transactionSource: {
         type: String,
-        // required: true,
-        // minlength: 1,
-        // trim: true
     },
     status: {
         type: String,
-        // required: true,
         minlength: 1,
         trim: true
     },

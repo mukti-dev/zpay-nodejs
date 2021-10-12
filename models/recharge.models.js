@@ -5,8 +5,11 @@ const RechargeSchema = new mongoose.Schema({
     transactionId: {
         type: String,
     },
-    rechargeId: {
+    apiRechargeId: {
         type: String,
+    },
+    rechargeId: {
+        type: String
     },
     userid: {
         type: ObjectId,
@@ -21,13 +24,15 @@ const RechargeSchema = new mongoose.Schema({
     amount: {
         type: Number,
     },
+    cashback: {
+        type: Number,
+    },
     operator: {
         type: String,
         trim: true
     },
     status: {
         type: String,
-        // required: true,
         minlength: 1,
         trim: true
     },

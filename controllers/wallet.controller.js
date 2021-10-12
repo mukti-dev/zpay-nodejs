@@ -94,16 +94,14 @@ const addMoney = async (req, res) => {
         }
 
         const addTransaction = await addNewTransaction(newTransaction)
-        // if (status === "Completed") {
-
-        // }
         let wallet = {
             userid: userid,
             credit: amount,
             status: status,
             transactionid: addTransaction._id,
             transactionSource: devSource,
-            naration: 'Add Money by PG; Recharge Amount :' + amount + ', TransactionId: ' + addTransaction._id,
+            source: 'pg',
+            naration: narationText(null, 'RRT_wallet_credit'),
             createdBy: userid,
             modifiedBy: userid
         }

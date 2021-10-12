@@ -4,6 +4,7 @@ const InternalServer = require('../_errorHandler/500')
 const UnauthorizedError = require('../_errorHandler/401')
 const NotFoundError = require('../_errorHandler/404')
 const { Login } = require('../models/login.models')
+const { Wallet } = require('../models/wallet.models')
 const { ObjectId } = require('mongoose').Types
 
 const saveUserData = async (reqBody) => {
@@ -19,6 +20,15 @@ const saveUserData = async (reqBody) => {
             macAddresss: reqBody.macAddress
         })
         await loginData.save()
+        const wallet = new Wallet({
+            userid: userData._id,
+            naration: "User registration",
+            status: "Success",
+            createdBy: ObjectId(userData._id),
+            modifiedBy: ObjectId(userData._id)
+        })
+        await wallet.save()
+
         return userData
     } catch (error) {
         console.log(error)
@@ -26,10 +36,15 @@ const saveUserData = async (reqBody) => {
     }
 }
 
-const userLogin = async (reqBody) => {
+const userLogin = async (reqBody, usertype) => {
     try {
-        console.log(reqBody)
-        const user = await Users.findOne({ $and: [{ $or: [{ email: reqBody.username }, { phone: reqBody.username }] }, { status: "Active" }] }).exec()
+        usertype = usertype || false
+        let query = { $and: [{ $or: [{ email: reqBody.username }, { phone: reqBody.username }] }, { status: "Active" }] }
+        if (usertype) {
+            query = { $and: [{ $or: [{ email: reqBody.username }, { userType: "admin" }, { phone: reqBody.username }] }, { status: "Active" }] }
+        }
+
+        const user = await Users.findOne().exec()
         if (user && user !== null) {
             let isPwMatch = await decryptText(reqBody.password, user.password)
             if (!isPwMatch) {

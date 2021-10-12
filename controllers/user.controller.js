@@ -21,7 +21,11 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
     try {
-        let user = await userLogin(req.body)
+        let usertype
+        if (req.url.includes('admin')) {
+            usertype = 'admin'
+        }
+        let user = await userLogin(req.body, usertype)
         let userData = JSON.parse(JSON.stringify(user))
         delete userData.password
         delete userData.__v

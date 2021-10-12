@@ -19,15 +19,20 @@ const { connect } = require('./connection')
 connect()
 app.use(cors())
 
-app.use('/', require('./routes/index'))
+app.use('/', require('./routes/index')) // initial end point
 
-var privateKey = fs.readFileSync('./utils/privkey.pem');
-var certificate = fs.readFileSync('./utils/cert.pem');
+//certificate files for ssl connection
+const privateKey = fs.readFileSync('./utils/privkey.pem');
+const certificate = fs.readFileSync('./utils/fullchain.pem');
 
 
-https.createServer({
-    key: privateKey,
-    cert: certificate
-}, app).listen(PORT, () => {
+// https.createServer({
+//     key: privateKey,
+//     cert: certificate
+// }, app).listen(PORT, () => {
+//     console.log(`Zpay is running at PORT: ${PORT}`)
+// }); // work if the application is running at server
+
+app.listen(PORT, () => {
     console.log(`Zpay is running at PORT: ${PORT}`)
-});
+}) // works if application is running in localhost

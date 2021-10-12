@@ -1,5 +1,6 @@
 const express = require('express')
-const { walletHistory, walletDetail, allWallet, todayWallet, createOrder, addMoney, rechargeTransaction, razorpayRechargeTransaction } = require('../controllers/wallet.controller')
+const { walletHistory, walletDetail, allWallet, todayWallet, createOrder, addMoney } = require('../controllers/wallet.controller')
+const { rechargeTransaction, razorpayRechargeTransaction, updatePendingRecharge } = require('../controllers/rechargeTransaction.controller')
 const { authentication, adminAuthentication, customerAuthentication } = require('../services/auth.service')
 const router = express.Router()
 
@@ -12,6 +13,7 @@ router.get('/createOrder', authentication, createOrder)
 router.post('/addMoney', authentication, addMoney)
 router.post('/rechargeTransaction', authentication, rechargeTransaction)
 router.post('/razorpayRechargeTransaction', authentication, razorpayRechargeTransaction)
+router.post('/updateRechargeStatus', updatePendingRecharge)
 
 
 module.exports = router
